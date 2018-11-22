@@ -21,3 +21,5 @@ deploy/*
 
 # Added as per http://ryan.mcgeary.org/2011/02/09/vendor-everything-still-applies/
 vendor/bundle/ruby
+
+.idea/
