@@ -16,6 +16,7 @@
 require 'set'
 require 'elasticity'
 require 'aws-sdk-s3'
+require 'aws-sdk-emr'
 require 'awrence'
 require 'json'
 require 'base64'
@@ -55,10 +56,11 @@ module Snowplow
       include Monitoring::Logging
       include Snowplow::EmrEtlRunner::Utils
       include Snowplow::EmrEtlRunner::S3
+      include Snowplow::EmrEtlRunner::EMR
 
       # Initializes our wrapper for the Amazon EMR client.
-      Contract Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, ArchiveStep, ArchiveStep, ConfigHash, ArrayOf[String], String, TargetsHash, RdbLoaderSteps => EmrJob
-      def initialize(debug, staging, enrich, staging_stream_enrich, shred, es, archive_raw, rdb_load, archive_enriched, archive_shredded, config, enrichments_array, resolver, targets, rdbloader_steps)
+      Contract Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, ArchiveStep, ArchiveStep, ConfigHash, ArrayOf[String], String, TargetsHash, RdbLoaderSteps, Bool => EmrJob
+      def initialize(debug, staging, enrich, staging_stream_enrich, shred, es, archive_raw, rdb_load, archive_enriched, archive_shredded, config, enrichments_array, resolver, targets, rdbloader_steps, use_persistent_jobflow)
 
         logger.debug "Initializing EMR jobflow"
 
@@ -89,12 +91,24 @@ module Snowplow
           :secret_access_key => config[:aws][:secret_access_key],
           :region => config[:aws][:s3][:region])
 
+        emr = Aws::EMR::Client.new(
+          :access_key_id => config[:aws][:access_key_id],
+          :secret_access_key => config[:aws][:secret_access_key],
+          :region => config[:aws][:emr][:region])
+
         ami_version = Gem::Version.new(config[:aws][:emr][:ami_version])
 
         # Configure Elasticity with your AWS credentials
         Elasticity.configure do |c|
           c.access_key = config[:aws][:access_key_id]
           c.secret_key = config[:aws][:secret_access_key]
+        end
+
+        # If we are using a persistent jobflow attempt to discover if a cluster exists
+        if use_persistent_jobflow
+          emr_jobflow_id = EMR.get_emr_jobflow_id(emr, config[:aws][:emr][:jobflow][:job_name])
+        else
+
         end
 
         # Create a job flow
